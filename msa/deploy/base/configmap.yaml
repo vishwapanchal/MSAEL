@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reviews-service-config
+data:
+  DATA_DIR: /data
+  LOG_LEVEL: info

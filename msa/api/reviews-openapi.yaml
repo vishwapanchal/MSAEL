@@ -1,0 +1,414 @@
+openapi: 3.1.0
+info:
+  title: reviews-service
+  description: 'Product reviews: event-sourced commands, projected queries.'
+  version: 1.0.0
+paths:
+  /commands/reviews:
+    post:
+      tags:
+      - commands
+      summary: Submit Review
+      operationId: submit_review_commands_reviews_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /commands/reviews/{review_id}:
+    put:
+      tags:
+      - commands
+      summary: Edit Review
+      operationId: edit_review_commands_reviews__review_id__put
+      parameters:
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Review Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewEdit'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - commands
+      summary: Remove Review
+      operationId: remove_review_commands_reviews__review_id__delete
+      parameters:
+      - name: review_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Review Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /queries/products/{product_id}/reviews:
+    get:
+      tags:
+      - queries
+      summary: Product Reviews
+      operationId: product_reviews_queries_products__product_id__reviews_get
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Product Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Review'
+                title: Response Product Reviews Queries Products  Product Id  Reviews
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /queries/products/{product_id}/rating-summary:
+    get:
+      tags:
+      - queries
+      summary: Product Rating Summary
+      operationId: product_rating_summary_queries_products__product_id__rating_summary_get
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Product Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /healthz:
+    get:
+      tags:
+      - ops
+      summary: Healthz
+      operationId: healthz_healthz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /version:
+    get:
+      tags:
+      - ops
+      summary: Version
+      operationId: version_version_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+  /events:
+    get:
+      tags:
+      - ops
+      summary: Audit Log
+      operationId: audit_log_events_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/EventOut'
+                type: array
+                title: Response Audit Log Events Get
+  /admin/rebuild-projection:
+    post:
+      tags:
+      - ops
+      summary: Rebuild Projection
+      operationId: rebuild_projection_admin_rebuild_projection_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RebuildResult'
+components:
+  schemas:
+    CommandResult:
+      properties:
+        review_id:
+          type: string
+          title: Review Id
+        seq:
+          type: integer
+          title: Seq
+      type: object
+      required:
+      - review_id
+      - seq
+      title: CommandResult
+    EventOut:
+      properties:
+        seq:
+          type: integer
+          title: Seq
+        review_id:
+          type: string
+          title: Review Id
+        type:
+          type: string
+          title: Type
+        payload:
+          type: object
+          title: Payload
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - seq
+      - review_id
+      - type
+      - payload
+      - created_at
+      title: EventOut
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    Health:
+      properties:
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - status
+      title: Health
+    RatingSummary:
+      properties:
+        product_id:
+          type: string
+          title: Product Id
+        count:
+          type: integer
+          title: Count
+        average:
+          type: number
+          title: Average
+      type: object
+      required:
+      - product_id
+      - count
+      - average
+      title: RatingSummary
+    RebuildResult:
+      properties:
+        events_replayed:
+          type: integer
+          title: Events Replayed
+        reviews:
+          type: integer
+          title: Reviews
+      type: object
+      required:
+      - events_replayed
+      - reviews
+      title: RebuildResult
+    Review:
+      properties:
+        review_id:
+          type: string
+          title: Review Id
+        product_id:
+          type: string
+          title: Product Id
+        author:
+          type: string
+          title: Author
+        rating:
+          type: integer
+          title: Rating
+        title:
+          type: string
+          title: Title
+        body:
+          type: string
+          title: Body
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+      type: object
+      required:
+      - review_id
+      - product_id
+      - author
+      - rating
+      - title
+      - body
+      - created_at
+      - updated_at
+      title: Review
+    ReviewCreate:
+      properties:
+        product_id:
+          type: string
+          maxLength: 64
+          minLength: 1
+          pattern: ^[A-Za-z0-9_-]+$
+          title: Product Id
+          examples:
+          - OLJCESPC7Z
+        author:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Author
+        rating:
+          type: integer
+          maximum: 5.0
+          minimum: 1.0
+          title: Rating
+        title:
+          type: string
+          maxLength: 200
+          title: Title
+          default: ''
+        body:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Body
+      type: object
+      required:
+      - product_id
+      - author
+      - rating
+      - body
+      title: ReviewCreate
+    ReviewEdit:
+      properties:
+        rating:
+          type: integer
+          maximum: 5.0
+          minimum: 1.0
+          title: Rating
+        title:
+          type: string
+          maxLength: 200
+          title: Title
+          default: ''
+        body:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Body
+      type: object
+      required:
+      - rating
+      - body
+      title: ReviewEdit
+      description: Full replacement of the editable fields.
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    Version:
+      properties:
+        version:
+          type: string
+          title: Version
+      type: object
+      required:
+      - version
+      title: Version

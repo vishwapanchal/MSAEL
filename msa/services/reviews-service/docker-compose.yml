@@ -1,0 +1,15 @@
+services:
+  reviews-service:
+    build:
+      context: .
+      args:
+        APP_VERSION: "1.0.0"
+    ports:
+      - "8080:8080"
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - reviews-data:/data
+
+volumes:
+  reviews-data:
