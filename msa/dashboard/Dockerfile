@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+WORKDIR /srv
+COPY server.py index.html ./
+USER 10001
+EXPOSE 8090
+CMD ["python", "server.py"]

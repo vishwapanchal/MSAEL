@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Architecture Console</title>
+<style>
+:root{
+  color-scheme:light;
+  --ink:#0f1b33; --muted:#44516d; --faint:#7886a3;
+  --glass:rgba(255,255,255,.72); --glass-strong:rgba(255,255,255,.9); --glass-line:rgba(255,255,255,.95);
+  --line:rgba(40,60,110,.14);
+  --accent:#2f5df0; --accent2:#7050ef; --ok:#0f9d63; --warn:#d98a06; --bad:#d93a32;
+  --shadow:0 12px 32px rgba(35,55,115,.14),0 2px 6px rgba(35,55,115,.08);
+  --shadow-lg:0 26px 60px rgba(35,55,115,.22),0 4px 12px rgba(35,55,115,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+  background:linear-gradient(135deg,#e9f0ff 0%,#f5eeff 48%,#e6f8f0 100%) fixed;min-height:100vh}
+body::before,body::after{content:"";position:fixed;z-index:-1;border-radius:50%;filter:blur(80px);opacity:.5}
+body::before{width:560px;height:560px;left:-140px;top:-160px;background:#9db8ff}
+body::after{width:600px;height:600px;right:-180px;bottom:-220px;background:#cdb0ff}
+.glass{background:var(--glass);border:1px solid var(--glass-line);border-radius:22px;
+  -webkit-backdrop-filter:blur(16px) saturate(1.4);backdrop-filter:blur(16px) saturate(1.4);box-shadow:var(--shadow)}
+.wrap{max-width:1720px;margin:0 auto;padding:18px 22px 30px}
+
+header.glass{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 22px;margin-bottom:16px;position:sticky;top:10px;z-index:30}
+h1{font-size:22px;margin:0;font-weight:750;letter-spacing:.2px}
+.sub{color:var(--muted);font-size:14px}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;font-size:14px;font-weight:600;background:var(--glass-strong);border:1px solid var(--glass-line);box-shadow:0 1px 4px rgba(35,55,115,.10)}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--faint);display:inline-block;flex:none}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(15,157,99,.18)}.dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(217,138,6,.2)}.dot.bad{background:var(--bad);box-shadow:0 0 0 4px rgba(217,58,50,.2)}
+button,.btn{font:inherit;font-size:15px;font-weight:600;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-line);border-radius:12px;padding:9px 16px;cursor:pointer;
+  box-shadow:0 2px 8px rgba(35,55,115,.12);transition:transform .15s,box-shadow .15s;text-decoration:none;display:inline-block}
+button:hover,.btn:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(35,55,115,.18)}
+button:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.primary,.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
+button.danger{color:var(--bad)}
+button[disabled]{opacity:.5;pointer-events:none}
+.switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-weight:600;font-size:15px}
+.switch input{display:none}.switch i{width:44px;height:25px;border-radius:999px;background:#bcc6dc;position:relative;transition:.2s}
+.switch i::after{content:"";position:absolute;left:3px;top:3px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.2s}
+.switch input:checked+i{background:var(--ok)}.switch input:checked+i::after{left:22px}
+
+/* ---------- bento grid ---------- */
+.bento{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.tile{padding:20px 22px;min-width:0}
+.tile h2{margin:0 0 12px;font-size:18px;font-weight:750;letter-spacing:.2px}
+.kpi{grid-column:span 2;padding:18px 20px;transition:transform .2s,box-shadow .2s}
+.kpi:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.kpi .l{color:var(--muted);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.9px}
+.kpi .v{font-size:36px;font-weight:800;line-height:1.15;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .n{color:var(--muted);font-size:14px}
+#spark{display:block;width:100%;height:30px;margin-top:6px}
+.map{grid-column:span 8;grid-row:span 2;padding:0;overflow:hidden;position:relative;display:flex;flex-direction:column}
+.maphead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid var(--line)}
+.maphead h2{margin:0}.maphead .hint{color:var(--muted);font-size:14px}
+.tools{display:flex;gap:8px;align-items:center;font-weight:600;font-size:14px}
+.perspective{perspective:1800px;perspective-origin:50% 20%;flex:1;min-height:700px;background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.9),rgba(255,255,255,.15) 70%)}
+#stage{width:100%;height:100%;transform-origin:50% 55%;transition:transform .5s cubic-bezier(.2,.8,.2,1);transform:rotateX(var(--tilt,6deg))}
+svg#map{width:100%;height:100%;display:block;cursor:grab;overflow:visible}
+svg#map.drag{cursor:grabbing}
+.edge{fill:none;stroke:rgba(60,80,130,.35);stroke-width:2}
+.edge.flow{stroke:url(#flowGrad);stroke-width:3;stroke-dasharray:5 11;animation:flow 1s linear infinite}
+.edge.broken{stroke:var(--bad);stroke-width:3;stroke-dasharray:3 8}
+.edge.store{stroke-dasharray:8 6}
+@keyframes flow{to{stroke-dashoffset:-16}}
+@media (prefers-reduced-motion:reduce){.edge.flow{animation:none}#stage{transition:none}}
+.node{cursor:pointer}
+.node .card{fill:url(#cardGrad);stroke:rgba(255,255,255,1);stroke-width:2;filter:url(#lift);transition:filter .2s}
+.node .back{fill:rgba(255,255,255,.6);stroke:rgba(60,80,130,.14)}
+.node:hover .card{filter:url(#liftHi)}
+.node.sel .card{stroke:var(--accent);stroke-width:3.5}
+.node .nm{font-size:18px;font-weight:750;fill:#0f1b33}.node .tag{font-size:13.5px;fill:#44516d}.node .st{font-size:14.5px;font-weight:600;fill:#2c3957;font-variant-numeric:tabular-nums}
+.legend{margin:0 18px 16px;align-self:flex-start;display:flex;gap:18px;flex-wrap:wrap;padding:9px 16px;border-radius:14px;font-size:14px;color:var(--muted);font-weight:600}
+.legend i{display:inline-block;width:22px;border-top:3px dotted;vertical-align:middle;margin-right:6px}
+
+.details{grid-column:span 4}
+.reviews{grid-column:span 4}
+.scn-tile{grid-column:span 4}.time-tile{grid-column:span 4}.ev-tile{grid-column:span 4}
+.scn{padding:14px 16px;border-radius:16px;background:var(--glass-strong);border:1px solid var(--glass-line);margin-bottom:12px;box-shadow:0 3px 10px rgba(35,55,115,.10);transition:transform .18s,box-shadow .18s}
+.scn:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(35,55,115,.18)}
+.scn b{display:block;font-size:16px}.scn p{margin:4px 0 10px;color:var(--muted);font-size:14.5px}
+.scn .num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:14px;margin-right:8px}
+.steps{margin:0;padding:0;list-style:none;font-size:15px}
+.steps li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.steps li i{flex:none;width:12px;height:12px;margin-top:6px;border-radius:50%;background:var(--faint)}
+.steps li.run i{background:var(--warn);animation:pulse 1s infinite}.steps li.done i{background:var(--ok)}.steps li.fail i{background:var(--bad)}
+@keyframes pulse{50%{opacity:.35}}
+table{width:100%;border-collapse:collapse;font-size:14.5px;font-variant-numeric:tabular-nums}
+th{color:var(--muted);font-weight:700;text-align:left;padding:4px 8px 8px 0;font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:8px 8px 8px 0;border-top:1px solid var(--line);word-break:break-all}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.muted{color:var(--muted)}.empty{color:var(--muted);padding:6px 0}
+.stepper{display:inline-flex;align-items:center;gap:12px;font-weight:600}.stepper button{padding:4px 14px;font-size:18px}.stepper b{min-width:22px;text-align:center;font-size:20px}
+.scroll{max-height:380px;overflow:auto}
+.ev{display:grid;grid-template-columns:78px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14.5px}
+.ev:first-of-type{border-top:0}.ev.Warning b,.ev.bad b{color:var(--bad)}.ev.rec b{color:var(--ok)}
+
+#logwin{position:fixed;right:28px;bottom:28px;width:640px;height:380px;min-width:360px;min-height:220px;z-index:50;display:none;flex-direction:column;resize:both;overflow:hidden;border-radius:18px;box-shadow:var(--shadow-lg)}
+#logwin.open{display:flex}
+#loghead{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:move;border-bottom:1px solid var(--line);user-select:none;background:rgba(255,255,255,.65);font-size:15px}
+#logbody{flex:1;overflow:auto;padding:10px 14px;font:13.5px/1.55 Consolas,"Cascadia Mono",monospace;background:rgba(15,25,50,.93);color:#e3ecff}
+#logbody div{white-space:pre-wrap;word-break:break-word}
+#logbody .status{color:#ffd479;border-left:3px solid #ffd479;padding-left:10px;margin:6px 0}
+#logbody .err{color:#ff9a94}.lg-warn{color:#ffd479}
+#banner{display:none;margin-bottom:16px;padding:14px 20px;color:var(--bad);font-weight:600;border-radius:16px}
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,10px);background:rgba(15,27,51,.95);color:#fff;padding:12px 22px;border-radius:14px;opacity:0;transition:.25s;pointer-events:none;z-index:70;max-width:560px;font-size:15px}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+@media (max-width:1300px){.kpi{grid-column:span 4}.map{grid-column:span 12;grid-row:auto}.details,.reviews,.scn-tile,.time-tile,.ev-tile{grid-column:span 6}}
+@media (max-width:800px){.kpi{grid-column:span 6}.details,.reviews,.scn-tile,.time-tile,.ev-tile{grid-column:span 12}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="glass">
+  <div><h1>Architecture Console</h1><div class="sub">Namespace <b id="ns">boutique-staging</b> · live Kubernetes data, nothing simulated</div></div>
+  <div class="spacer"></div>
+  <span class="pill"><span class="dot" id="clusterDot"></span><span id="clusterTxt">connecting</span></span>
+  <span class="pill" id="updated">-</span>
+  <label class="switch" title="Restore replica counts to the baseline automatically"><input type="checkbox" id="heal" checked><i></i>Auto-heal</label>
+  <button id="restore">Restore baseline</button>
+  <a class="btn primary" href="/">Back to shop</a>
+</header>
+<div id="banner" class="glass"></div>
+
+<main class="bento">
+  <div class="glass kpi"><div class="l">Services healthy</div><div class="v" id="kHealthy">-</div><div class="n" id="kHealthyN">&nbsp;</div></div>
+  <div class="glass kpi"><div class="l">Pods ready</div><div class="v" id="kPods">-</div><div class="n">running containers</div></div>
+  <div class="glass kpi"><div class="l">Restarts</div><div class="v" id="kRestarts">-</div><div class="n">container restarts</div></div>
+  <div class="glass kpi"><div class="l">CPU</div><div class="v" id="kCpu">-</div><div class="n" id="kCpuN">all pods</div></div>
+  <div class="glass kpi"><div class="l">Memory</div><div class="v" id="kMem">-</div><div class="n" id="kMemN">all pods</div></div>
+  <div class="glass kpi"><div class="l">Shop availability</div><div class="v" id="kAvail">-</div><canvas id="spark" width="240" height="30"></canvas></div>
+
+  <section class="glass map" aria-label="Service topology">
+    <div class="maphead">
+      <h2>Service topology</h2><span class="hint">Scroll to zoom · drag to pan · click a service for details and live logs · double-click to focus</span>
+      <div class="spacer"></div>
+      <div class="tools"><label>3D <input type="range" id="tilt" min="0" max="30" value="6" style="vertical-align:middle;width:80px"></label>
+      <button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zreset">Reset</button></div>
+    </div>
+    <div class="perspective"><div id="stage">
+      <svg id="map" viewBox="0 0 1190 790" role="img" aria-label="Service dependency graph">
+        <defs>
+          <linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eaf0ff"/></linearGradient>
+          <linearGradient id="flowGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2f5df0"/><stop offset="1" stop-color="#7050ef"/></linearGradient>
+          <filter id="lift" x="-20%" y="-20%" width="140%" height="170%"><feDropShadow dx="0" dy="9" stdDeviation="8" flood-color="#233a85" flood-opacity=".24"/></filter>
+          <filter id="liftHi" x="-20%" y="-20%" width="140%" height="180%"><feDropShadow dx="0" dy="16" stdDeviation="11" flood-color="#233a85" flood-opacity=".34"/></filter>
+        </defs>
+      </svg>
+    </div></div>
+    <div class="legend glass"><span><i style="border-color:#2f5df0"></i>call path up</span><span><i style="border-color:#d93a32"></i>dependency down</span><span><i style="border-color:#7886a3;border-top-style:dashed"></i>data store</span><span>Animation = path available, not traffic volume</span></div>
+  </section>
+
+  <aside class="glass tile details" id="detail"><h2>Service details</h2><p class="empty">Select a service on the map.</p></aside>
+  <aside class="glass tile reviews"><h2>reviews-service · event sourced</h2><div id="reviewsBody" class="empty">checking</div></aside>
+
+  <section class="glass tile scn-tile" aria-label="Scenarios">
+    <h2>Scenarios</h2><div id="scenarios"></div>
+    <h2 style="margin-top:16px">Run log</h2>
+    <ul class="steps" id="steps"><li><i></i><span class="muted">Pick a scenario to start.</span></li></ul>
+  </section>
+  <section class="glass tile time-tile"><h2>Resilience timeline</h2><div class="scroll" id="rlog"><p class="empty">Kill a pod to see detection and recovery time.</p></div>
+    <h2 style="margin-top:16px">Self-healing actions</h2><div class="scroll" id="hlog" style="max-height:200px"><p class="empty">No actions yet.</p></div></section>
+  <section class="glass tile ev-tile"><h2>Kubernetes events</h2><div class="scroll" id="events" style="max-height:640px"></div></section>
+</main>
+</div>
+
+<div id="logwin" class="glass" role="dialog" aria-label="Live logs">
+  <div id="loghead"><span class="dot ok" id="logdot"></span><b id="logtitle">logs</b><span class="muted" id="logpod"></span><div class="spacer"></div>
+    <button id="logpause">Pause</button><button id="logclear">Clear</button><button id="logclose" aria-label="Close">✕</button></div>
+  <div id="logbody"></div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+const W=236,H=88;
+const NODES={
+  loadgenerator:{x:10,y:350,lang:"Python · Locust"},
+  frontend:{x:290,y:350,lang:"Go"},
+  adservice:{x:640,y:10,lang:"Java"},
+  recommendationservice:{x:640,y:120,lang:"Python"},
+  productcatalogservice:{x:640,y:230,lang:"Go"},
+  currencyservice:{x:640,y:340,lang:"Node.js"},
+  cartservice:{x:640,y:450,lang:"C#"},
+  shippingservice:{x:640,y:560,lang:"Go"},
+  checkoutservice:{x:640,y:670,lang:"Go"},
+  "reviews-service":{x:930,y:10,lang:"Python · FastAPI",own:true},
+  "redis-cart":{x:930,y:450,lang:"Redis"},
+  paymentservice:{x:930,y:580,lang:"Node.js"},
+  emailservice:{x:930,y:690,lang:"Python"}
+};
+// Call paths taken from the gRPC clients in src/ and protos/demo.proto.
+const EDGES=[["loadgenerator","frontend"],["frontend","adservice"],["frontend","recommendationservice"],["frontend","productcatalogservice"],
+["frontend","currencyservice"],["frontend","cartservice"],["frontend","shippingservice"],["frontend","checkoutservice"],
+["checkoutservice","cartservice"],["checkoutservice","productcatalogservice"],["checkoutservice","currencyservice"],
+["checkoutservice","shippingservice"],["checkoutservice","paymentservice"],["checkoutservice","emailservice"],
+["recommendationservice","productcatalogservice"],["cartservice","redis-cart",true]];
+const VB={x:0,y:0,w:1190,h:790};
+const NS_="http://www.w3.org/2000/svg",$=id=>document.getElementById(id),svg=$("map");
+let data=null,selected="frontend",view={...VB},down={},resLog=[],avail=[],apiLost=false,runningScenario=false;
+
+const el=(n,a={},p)=>{const e=document.createElementNS(NS_,n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+const toast=m=>{const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),3800)};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const COL={ok:"#0f9d63",warn:"#d98a06",bad:"#d93a32"};
+
+// ---------- topology
+const gEdges=el("g",{},svg),gNodes=el("g",{},svg),edgeEls=[],nodeEls={};
+function anchor(a,b){const A=NODES[a],B=NODES[b];
+  if(Math.abs(A.x-B.x)<10)return{x1:A.x+W,y1:A.y+H/2,x2:B.x+W,y2:B.y+H/2,curve:true};
+  const r=B.x>A.x;return{x1:r?A.x+W:A.x,y1:A.y+H/2,x2:r?B.x:B.x+W,y2:B.y+H/2}}
+EDGES.forEach(([a,b,store])=>{const g=anchor(a,b);let d;
+  if(g.curve)d=`M${g.x1},${g.y1} C${g.x1+60},${g.y1} ${g.x2+60},${g.y2} ${g.x2},${g.y2}`;
+  else{const m=(g.x1+g.x2)/2;d=`M${g.x1},${g.y1} C${m},${g.y1} ${m},${g.y2} ${g.x2},${g.y2}`}
+  edgeEls.push({a,b,store,e:el("path",{d,class:"edge"+(store?" store":"")},gEdges)})});
+(function(){const A=NODES["reviews-service"];
+  const e=el("path",{d:`M${A.x+W/2},${A.y+H} L${A.x+W/2},${A.y+H+60}`,class:"edge store"},gEdges);
+  el("text",{x:A.x+W/2+12,y:A.y+H+42,"font-size":14,"font-weight":600,fill:"#44516d"},gEdges).textContent="own volume (SQLite)";
+  edgeEls.push({a:"reviews-service",b:null,store:true,e})})();
+Object.entries(NODES).forEach(([name,n])=>{
+  const g=el("g",{class:"node",transform:`translate(${n.x},${n.y})`,tabindex:0,role:"button","aria-label":name},gNodes);
+  el("rect",{width:W,height:H,rx:16,class:"back",transform:"translate(10,-10)"},g);
+  el("rect",{width:W,height:H,rx:16,class:"back",transform:"translate(5,-5)"},g);
+  el("rect",{width:W,height:H,rx:16,class:"card"},g);
+  el("circle",{cx:20,cy:25,r:7,class:"sdot",fill:"#7886a3"},g);
+  el("text",{x:36,y:31,class:"nm"},g).textContent=name;
+  el("text",{x:20,y:53,class:"tag"},g).textContent=n.lang+(n.own?"  ·  ours":"");
+  el("text",{x:20,y:77,class:"st"},g);
+  el("g",{class:"pods",transform:`translate(${W-20},${H-18})`},g);
+  g.addEventListener("click",()=>select(name));
+  g.addEventListener("keydown",e=>{if(e.key==="Enter")select(name)});
+  g.addEventListener("dblclick",()=>focusOn(name));
+  nodeEls[name]=g});
+
+function setView(){svg.setAttribute("viewBox",`${view.x} ${view.y} ${view.w} ${view.h}`)}
+function zoom(f,cx,cy){const r=svg.getBoundingClientRect(),px=cx===undefined?.5:(cx-r.left)/r.width,py=cy===undefined?.5:(cy-r.top)/r.height;
+  const nw=Math.min(2400,Math.max(260,view.w*f)),nh=nw*(view.h/view.w);view.x+=(view.w-nw)*px;view.y+=(view.h-nh)*py;view.w=nw;view.h=nh;setView()}
+function animateTo(t){const s={...view},t0=performance.now();(function step(now){const k=Math.min(1,(now-t0)/450),e=1-Math.pow(1-k,3);
+  for(const p of["x","y","w","h"])view[p]=s[p]+(t[p]-s[p])*e;setView();if(k<1)requestAnimationFrame(step)})(t0)}
+function focusOn(n){const N=NODES[n];select(n);animateTo({x:N.x-300,y:N.y-200,w:760,h:760*(VB.h/VB.w)})}
+$("zin").onclick=()=>zoom(.8);$("zout").onclick=()=>zoom(1.25);$("zreset").onclick=()=>animateTo({...VB});
+svg.addEventListener("wheel",e=>{e.preventDefault();zoom(e.deltaY<0?.88:1.14,e.clientX,e.clientY)},{passive:false});
+let pan=null;
+svg.addEventListener("pointerdown",e=>{if(e.target.closest(".node"))return;pan={x:e.clientX,y:e.clientY};svg.classList.add("drag");svg.setPointerCapture(e.pointerId)});
+svg.addEventListener("pointermove",e=>{if(!pan)return;const r=svg.getBoundingClientRect();view.x-=(e.clientX-pan.x)*view.w/r.width;view.y-=(e.clientY-pan.y)*view.h/r.height;pan={x:e.clientX,y:e.clientY};setView()});
+svg.addEventListener("pointerup",()=>{pan=null;svg.classList.remove("drag")});
+$("tilt").oninput=e=>$("stage").style.setProperty("--tilt",e.target.value+"deg");
+
+// ---------- state
+function health(name){const s=data&&data.services&&data.services[name];
+  if(!s)return{k:"bad",t:"no data",ready:0,total:0,desired:0};
+  const desired=s.desired===undefined?s.total:s.desired;
+  if(desired===0)return{k:"bad",t:"scaled to 0",ready:0,total:0,desired};
+  if(s.ready>=desired&&s.ready===s.total)return{k:"ok",t:`${s.ready}/${desired} ready`,ready:s.ready,total:s.total,desired};
+  if(s.ready>0)return{k:"warn",t:`${s.ready}/${desired} ready`,ready:s.ready,total:s.total,desired};
+  return{k:"bad",t:(s.pods[0]&&s.pods[0].phase)||"starting",ready:0,total:s.total,desired}}
+const ago=ts=>{if(!ts)return"-";const s=Math.max(0,(Date.now()-new Date(ts))/1000);return s<90?Math.round(s)+"s":s<5400?Math.round(s/60)+"m":Math.round(s/3600)+"h"};
+const esc=s=>String(s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function render(){
+  if(!data)return;
+  $("ns").textContent=data.namespace||"boutique-staging";
+  $("clusterDot").className="dot "+(data.cluster?"ok":"bad");
+  $("clusterTxt").textContent=data.cluster?"cluster reachable":"cluster unreachable";
+  $("updated").textContent="updated "+new Date().toLocaleTimeString();
+  $("heal").checked=!!data.autoheal;
+  const b=$("banner");
+  if(apiLost){b.style.display="block";b.textContent="Console connection lost. The frontend that serves this page is probably restarting; reconnecting automatically."}
+  else if(!data.cluster){b.style.display="block";b.textContent="Cannot reach the Kubernetes API: "+(data.error||"")}
+  else b.style.display="none";
+  let healthy=0,total=0,pods=0,ready=0,restarts=0,cpu=0,mem=0;
+  Object.keys(NODES).forEach(n=>{
+    const h=health(n),g=nodeEls[n],s=data.services[n];total++;if(h.k==="ok")healthy++;
+    g.querySelector(".sdot").setAttribute("fill",COL[h.k]);
+    let line=h.t;
+    if(s&&s.pods.length&&s.pods[0].cpu_m!==undefined){const c=s.pods.reduce((a,p)=>a+(p.cpu_m||0),0),m=s.pods.reduce((a,p)=>a+(p.mem_mi||0),0);line+=`  ·  ${Math.round(c)}m  ${Math.round(m)}Mi`}
+    g.querySelector(".st").textContent=line;
+    g.classList.toggle("sel",n===selected);
+    const pg=g.querySelector(".pods");pg.innerHTML="";
+    ((s&&s.pods)||[]).slice(0,5).forEach((p,i)=>el("circle",{cx:-i*18,cy:0,r:7,fill:p.ready?COL.ok:(p.phase==="Terminating"?COL.bad:COL.warn)},pg));
+    const isDown=h.k!=="ok";
+    if(isDown&&!down[n]){down[n]=Date.now();resLog.unshift({t:new Date(),n,msg:"went down",bad:true})}
+    if(!isDown&&down[n]){resLog.unshift({t:new Date(),n,msg:`recovered after ${((Date.now()-down[n])/1000).toFixed(1)}s`,rec:true});delete down[n]}
+    if(s){pods+=s.total;ready+=s.ready;s.pods.forEach(p=>{restarts+=p.restarts||0;cpu+=p.cpu_m||0;mem+=p.mem_mi||0})}});
+  edgeEls.forEach(({a,b,e,store})=>{if(!b){e.setAttribute("class","edge store");return}
+    const up=health(a).ready>0&&health(b).ready>0;
+    e.setAttribute("class","edge"+(store?" store":"")+(up?(store?"":" flow"):" broken"))});
+  $("kHealthy").textContent=`${healthy}/${total}`;$("kHealthyN").textContent=healthy===total?"all services up":(total-healthy)+" degraded";
+  $("kPods").textContent=`${ready}/${pods}`;$("kRestarts").textContent=restarts;
+  if(data.metrics){$("kCpu").textContent=Math.round(cpu)+"m";$("kMem").textContent=Math.round(mem)+" Mi"}else{$("kCpu").textContent="n/a";$("kMem").textContent="n/a";$("kCpuN").textContent="metrics-server off";$("kMemN").textContent="metrics-server off"}
+  renderDetail();renderLogs()}
+
+function select(n){selected=n;render();openLogs(n)}
+function renderDetail(){const box=$("detail");if(!selected)return;
+  const s=data.services[selected]||{pods:[]},h=health(selected),base=(data.baseline||{})[selected];
+  const rows=s.pods.map(p=>`<tr><td>${esc(p.name.replace(selected+"-",""))}</td><td>${esc(p.phase)}</td><td>${p.restarts}</td><td>${p.cpu_m!==undefined?Math.round(p.cpu_m)+"m / "+Math.round(p.mem_mi)+"Mi":"-"}</td><td>${ago(p.started)}</td></tr>`).join("");
+  box.innerHTML=`<h2>${selected} <span class="pill"><span class="dot ${h.k}"></span>${h.t}</span></h2>
+   <p class="muted" style="margin:0 0 10px">${NODES[selected].lang}${NODES[selected].own?" · built for this project":" · upstream sample service"}</p>
+   <table><tr><th>Pod</th><th>Phase</th><th>Restarts</th><th>CPU / Mem</th><th>Age</th></tr>${rows||'<tr><td colspan="5" class="empty">no pods</td></tr>'}</table>
+   <div style="margin-top:16px" class="stepper"><span class="muted">Baseline replicas</span><button id="bm">−</button><b>${base}</b><button id="bp">+</button></div>
+   <div class="row"><button class="danger" data-a="kill">Kill pod</button><button class="danger" data-a="s0">Scale to 0</button><button data-a="s1">Scale to 1</button><button data-a="s2">Scale to 2</button><button data-a="focus">Zoom to service</button></div>
+   <p class="muted" style="margin:14px 0 0;font-size:14px">With auto-heal on, a changed replica count returns to the baseline after ${data.heal_grace||8}s. A killed pod is recreated by Kubernetes straight away.</p>`;
+  box.querySelectorAll("button[data-a]").forEach(b=>b.onclick=()=>act(b.dataset.a));
+  $("bm").onclick=()=>post("api/baseline",{service:selected,replicas:Math.max(0,base-1)}).then(poll);
+  $("bp").onclick=()=>post("api/baseline",{service:selected,replicas:Math.min(5,base+1)}).then(poll)}
+function renderLogs(){
+  $("rlog").innerHTML=resLog.length?resLog.slice(0,30).map(r=>`<div class="ev ${r.bad?"bad":"rec"}"><span class="muted">${r.t.toLocaleTimeString()}</span><span><b>${r.n}</b> ${r.msg}</span></div>`).join(""):'<p class="empty">Kill a pod to see detection and recovery time.</p>';
+  $("hlog").innerHTML=(data.heal_log||[]).length?data.heal_log.map(h=>`<div class="ev rec"><span class="muted">${h.t}</span><span><b>auto-heal</b> ${esc(h.msg)}</span></div>`).join(""):'<p class="empty">No actions yet.</p>';
+  $("events").innerHTML=(data.events||[]).map(e=>`<div class="ev ${e.type}"><span class="muted">${(e.time||"").slice(11,19)}</span><span><b>${esc(e.reason)}</b> ${esc(e.object||"")}<br><span class="muted">${esc(e.message)}</span></span></div>`).join("")||'<p class="empty">No events yet.</p>'}
+
+// ---------- actions
+async function post(path,body){try{const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});return await r.json()}catch(e){return{ok:false,message:"console unreachable"}}}
+async function act(a){if(a==="focus")return focusOn(selected);
+  const res=a==="kill"?await post("api/chaos/kill",{service:selected}):await post("api/chaos/scale",{service:selected,replicas:+a.slice(1)});
+  toast(res.ok?res.message:"Failed: "+res.message);poll()}
+$("heal").onchange=async e=>{const r=await post("api/autoheal",{enabled:e.target.checked});toast(r.message);poll()};
+$("restore").onclick=async()=>{const r=await post("api/restore");toast(r.message);poll()};
+
+// ---------- live logs (server-sent events, follows pod restarts)
+let es=null,paused=false,logService=null;
+function logLine(text,cls){const b=$("logbody"),d=document.createElement("div");if(cls)d.className=cls;
+  let out=text;try{const j=JSON.parse(text);if(j&&j.message){out=`${(j.timestamp||"").slice(11,19)} ${(j.severity||"").toUpperCase().padEnd(5)} ${j.message}`;if(j["http.req.path"])out+=`  ${j["http.req.method"]||""} ${j["http.req.path"]} ${j["http.resp.status"]||""}`;if(/warn/i.test(j.severity))d.className="lg-warn";if(/err/i.test(j.severity))d.className="err"}}catch(_){}
+  d.textContent=out;b.appendChild(d);while(b.childNodes.length>600)b.removeChild(b.firstChild);if(!paused)b.scrollTop=b.scrollHeight}
+function openLogs(svc){if(logService===svc&&es)return;logService=svc;closeEs();$("logbody").innerHTML="";
+  $("logwin").classList.add("open");$("logtitle").textContent=svc+" · live logs";$("logpod").textContent="";
+  es=new EventSource("api/logs?service="+encodeURIComponent(svc));
+  es.addEventListener("log",e=>logLine(JSON.parse(e.data)));
+  es.addEventListener("status",e=>{const t=JSON.parse(e.data);logLine("— "+t,"status");const m=t.match(/pod (\S+)/);if(m&&/attached/.test(t))$("logpod").textContent=m[1];$("logdot").className="dot "+(/ended|no running|not ready/.test(t)?"warn":"ok")});
+  es.onerror=()=>{$("logdot").className="dot bad"}}
+function closeEs(){if(es){es.close();es=null}}
+$("logclose").onclick=()=>{closeEs();logService=null;$("logwin").classList.remove("open")};
+$("logclear").onclick=()=>$("logbody").innerHTML="";
+$("logpause").onclick=e=>{paused=!paused;e.target.textContent=paused?"Resume":"Pause"};
+(function drag(){const w=$("logwin"),h=$("loghead");let o=null;
+  h.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;const r=w.getBoundingClientRect();o={dx:e.clientX-r.left,dy:e.clientY-r.top};h.setPointerCapture(e.pointerId)});
+  h.addEventListener("pointermove",e=>{if(!o)return;w.style.left=(e.clientX-o.dx)+"px";w.style.top=(e.clientY-o.dy)+"px";w.style.right="auto";w.style.bottom="auto"});
+  h.addEventListener("pointerup",()=>o=null)})();
+
+// ---------- reviews panel
+async function renderReviews(){const box=$("reviewsBody");
+  try{const r=await(await fetch("api/reviews")).json();
+    if(!r.reachable){box.className="empty";box.textContent="reviews-service is not reachable right now.";return}
+    box.className="";
+    box.innerHTML=`<table><tr><td class="muted">Version</td><td><b>${esc(r.version)}</b></td></tr><tr><td class="muted">Events stored</td><td><b>${r.event_count}</b></td></tr></table>
+     <table style="margin-top:10px"><tr><th>seq</th><th>latest events</th></tr>${(r.last_events||[]).map(e=>`<tr><td>${e.seq}</td><td>${esc(e.type)}</td></tr>`).join("")||'<tr><td colspan="2" class="empty">none yet</td></tr>'}</table>
+     <div class="row"><button class="primary" id="seed">Add sample review</button><button id="rebuild">Rebuild read model</button></div>`;
+    $("seed").onclick=async()=>{const x=await post("api/reviews/seed");toast(x.message);renderReviews()};
+    $("rebuild").onclick=async()=>{const x=await post("api/reviews/rebuild");toast(x.message);renderReviews()};
+    return r}catch(e){box.textContent="console unreachable"}}
+
+// ---------- availability probe: the real shop, once a second
+async function probe(){let ok=false;
+  try{const r=await fetch("/_healthz",{cache:"no-store"});ok=r.ok}catch(e){}
+  avail.push(ok?1:0);if(avail.length>90)avail.shift();
+  const pct=Math.round(100*avail.reduce((a,b)=>a+b,0)/avail.length);
+  $("kAvail").textContent=pct+"%";$("kAvail").style.color=ok?"":COL.bad;
+  const c=$("spark"),x=c.getContext("2d");x.clearRect(0,0,c.width,c.height);
+  const bw=c.width/90;avail.forEach((v,i)=>{x.fillStyle=v?COL.ok:COL.bad;x.fillRect(i*bw,v?9:2,bw-.8,v?19:26)})}
+
+// ---------- scenarios: every step uses real actions and real state
+const waitFor=async(fn,ms=90000)=>{const t=Date.now();while(Date.now()-t<ms){if(fn())return(Date.now()-t)/1000;await sleep(400)}return null};
+const isUp=n=>health(n).k==="ok";
+const SCENARIOS=[
+ {title:"Self-healing: kill one pod",desc:"Kill the product catalog pod and measure how fast Kubernetes replaces it.",run:async c=>{
+   c.s("Check productcatalogservice is healthy");await waitFor(()=>isUp("productcatalogservice"),20000);
+   c.s("Delete its pod");await post("api/chaos/kill",{service:"productcatalogservice"});
+   c.s("Wait for the service to go down");await waitFor(()=>!isUp("productcatalogservice"),8000);
+   c.s("Wait for the replacement pod to become ready");const t=await waitFor(()=>isUp("productcatalogservice"),60000);
+   c.s(t===null?"Did not recover in 60s":"Recovered, see the resilience timeline for the measured time",t===null?"fail":"done")}},
+ {title:"Redundancy: two frontends, kill one",desc:"With two replicas, killing one pod does not interrupt the shop.",run:async c=>{
+   c.s("Make sure the frontend has 2 ready replicas");await post("api/chaos/scale",{service:"frontend",replicas:2});await waitFor(()=>health("frontend").ready>=2,60000);
+   const before=avail.filter(v=>!v).length;c.s("Kill one frontend pod");await post("api/chaos/kill",{service:"frontend"});
+   c.s("Watch the shop health probe for 15 seconds");await sleep(15000);
+   const miss=avail.filter(v=>!v).length-before;
+   c.s(miss===0?"Shop stayed available the whole time":`Shop missed ${miss} probe(s) while both pods restarted`,miss===0?"done":"fail")}},
+ {title:"Data survives a crash",desc:"Add a review, kill reviews-service, check the events are still there.",run:async c=>{
+   c.s("Add a sample review");await post("api/reviews/seed");const r1=await renderReviews();const n1=r1?r1.event_count:null;
+   c.s(`Events stored before the crash: ${n1}`);
+   c.s("Kill the reviews-service pod");await post("api/chaos/kill",{service:"reviews-service"});await waitFor(()=>!isUp("reviews-service"),8000);
+   c.s("Wait for the new pod");await waitFor(()=>isUp("reviews-service"),90000);await sleep(2500);
+   const r2=await renderReviews();c.s(`Events after restart: ${r2?r2.event_count:"unreachable"}`,r2&&r2.event_count===n1?"done":"fail")}},
+ {title:"Dependency failure: stop payments",desc:"Scale paymentservice to 0. The path from checkout turns red, then auto-heal restores it.",run:async c=>{
+   c.s("Scale paymentservice to 0");await post("api/chaos/scale",{service:"paymentservice",replicas:0});
+   c.s("Dependency shows as down on the map");await waitFor(()=>!isUp("paymentservice"),20000);
+   c.s(data.autoheal?`Wait for auto-heal (about ${data.heal_grace}s grace)`:"Auto-heal is off, using Restore baseline");
+   if(!data.autoheal){await post("api/restore")}
+   const t=await waitFor(()=>isUp("paymentservice"),90000);c.s(t===null?"Not restored":"Baseline restored",t===null?"fail":"done")}},
+ {title:"Total outage: kill every pod",desc:"Delete all pods. Every service must come back at its baseline replica count.",run:async c=>{
+   c.s("Delete every pod in the namespace (except this console)");await post("api/chaos/kill-all");
+   c.s("Watch services restart and re-initialise");const t0=Date.now();
+   await waitFor(()=>Object.keys(NODES).some(n=>!isUp(n)),10000);
+   const t=await waitFor(()=>Object.keys(NODES).every(n=>isUp(n)),240000);
+   c.s(t===null?"Not everything came back in 4 minutes":`All 13 services ready again after ${((Date.now()-t0)/1000).toFixed(0)}s at baseline counts`,t===null?"fail":"done")}}
+];
+(function buildScenarios(){const box=$("scenarios");
+  SCENARIOS.forEach((s,i)=>{const d=document.createElement("div");d.className="scn";
+    d.innerHTML=`<b><span class="num">${i+1}</span>${s.title}</b><p>${s.desc}</p><button class="primary">Run scenario</button>`;
+    d.querySelector("button").onclick=async()=>{if(runningScenario)return toast("A scenario is already running");
+      runningScenario=true;document.querySelectorAll(".scn button").forEach(b=>b.disabled=true);
+      const ul=$("steps");ul.innerHTML="";let cur=null;
+      const ctx={s(text,state){if(cur)cur.className="done";
+        const li=document.createElement("li");li.className=state||"run";li.innerHTML=`<i></i><span>${esc(text)}</span>`;ul.appendChild(li);cur=state?null:li}};
+      try{await s.run(ctx)}catch(err){ctx.s("Scenario error: "+err.message,"fail")}
+      if(cur)cur.className="done";runningScenario=false;document.querySelectorAll(".scn button").forEach(b=>b.disabled=false)};
+    box.appendChild(d)})})();
+
+async function poll(){
+  try{const r=await fetch("api/state",{cache:"no-store"});data=await r.json();apiLost=false}
+  catch(e){apiLost=true;if(!data)data={cluster:false,error:"console unreachable",services:{},events:[],baseline:{}}}
+  render()}
+poll();renderReviews();probe();
+setInterval(poll,2000);setInterval(renderReviews,8000);setInterval(probe,1000);
+</script>
+</body>
+</html>

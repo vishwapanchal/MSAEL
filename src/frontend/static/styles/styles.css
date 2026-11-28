@@ -675,3 +675,9 @@ the rules below could be extracted.
   width: 10px;
   height: 5px;
 }
+a.arch-link,a.arch-link:visited{
+  display:inline-flex;align-items:center;align-self:center;height:36px;margin-right:18px;padding:0 18px;
+  border:2px solid #2f5df0;border-radius:999px;font-size:14px;font-weight:700;line-height:1;
+  color:#2f5df0 !important;opacity:1 !important;text-decoration:none;letter-spacing:.2px;background:#fff;
+}
+a.arch-link:hover{background:#2f5df0;color:#fff !important;text-decoration:none}

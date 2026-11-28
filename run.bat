@@ -8,7 +8,28 @@ if /i "%~1"=="claude" goto mode_claude
 if /i "%~1"=="stop" goto mode_stop
 if /i "%~1"=="clean" goto mode_clean
 if /i "%~1"=="demo" goto mode_demo
+if /i "%~1"=="dashboard" goto mode_dashboard
+if /i "%~1"=="rebuild" set REBUILD=1
 goto mode_run
+
+:build
+if "%REBUILD%"=="1" goto build_do
+minikube image ls 2>nul | findstr /c:"%~1" >nul
+if not errorlevel 1 goto build_skip
+:build_do
+echo Building %~1
+if "%REBUILD%"=="1" (minikube image build -t %~1 --build-opt=no-cache %~2) else minikube image build -t %~1 %~2
+if errorlevel 1 exit /b 1
+set BUILT=1
+exit /b 0
+:build_skip
+echo %~1 already in minikube, skipping. Use run.bat rebuild after code changes.
+exit /b 0
+
+:mode_dashboard
+rem The console is part of the shop now: the Architecture button on the frontend
+start "" http://localhost:8080/architecture/
+exit /b 0
 
 :mode_demo
 rem Scenario: rolling update 1.0.0 to 1.1.0 then rollback (needs a running cluster)
@@ -44,6 +65,12 @@ exit /b 0
 echo ============================================================
 echo  Online Boutique + reviews-service: one-click setup
 echo ============================================================
+tasklist /fi "imagename eq minikube.exe" 2>nul | find /i "minikube.exe" >nul
+if errorlevel 1 goto no_other_run
+echo ERROR: another minikube command is already running, probably another run.bat window.
+echo Two runs at once delete each other's cluster. Close the other window and retry.
+exit /b 1
+:no_other_run
 
 echo [1/8] Checking tools
 call :need git Git.Git
@@ -106,38 +133,58 @@ echo [4/8] Starting minikube
 minikube status >nul 2>&1
 if not errorlevel 1 goto mk_ok
 minikube start --driver=docker --cpus=4 --memory=4096
+if not errorlevel 1 goto mk_ok
+echo First start attempt failed. Removing the half-built cluster and retrying once.
+minikube delete >nul 2>&1
+minikube start --driver=docker --cpus=4 --memory=4096
 if errorlevel 1 goto mk_fail
 goto mk_ok
 :mk_fail
 echo ERROR: minikube failed to start. Hint: raise Docker Desktop memory to 5GB or more and retry.
+echo Also make sure no other run.bat or minikube window is open.
 exit /b 1
 :mk_ok
+rem Addons enabled during the first start can fail before the API server is ready, so enable them again
+echo Waiting for the Kubernetes API
+set /a TRIES=0
+:wait_api
+kubectl get nodes >nul 2>&1
+if not errorlevel 1 goto api_ok
+set /a TRIES+=1
+if %TRIES% GEQ 60 goto mk_fail
+timeout /t 5 /nobreak >nul
+goto wait_api
+:api_ok
+minikube addons enable storage-provisioner >nul 2>&1
+minikube addons enable default-storageclass >nul 2>&1
+minikube addons enable metrics-server >nul 2>&1
 
 echo [5/8] Creating namespace and deploying Online Boutique
 kubectl create namespace %NS% --dry-run=client -o yaml | kubectl apply -f -
 if errorlevel 1 goto fail
-kubectl apply -n %NS% -f release\kubernetes-manifests.yaml
+rem The upstream frontend image is swapped for ours at apply time, so it is never downloaded.
+rem The other images start downloading now, in parallel with the builds below.
+powershell -NoProfile -Command "(Get-Content release\kubernetes-manifests.yaml -Raw) -replace 'us-central1-docker\.pkg\.dev/online-boutique-ci/microservices-demo/frontend:v0\.10\.7','boutique-frontend:1.0.0' | kubectl apply -n %NS% -f -"
 if errorlevel 1 goto fail
 
-echo [5b/8] Building the customised frontend with Google branding removed
-minikube image build -t frontend-local:1.0.0 src\frontend
+echo [6/8] Building our own images into minikube, skipped when already built
+set BUILT=0
+call :build boutique-frontend:1.0.0 src\frontend
 if errorlevel 1 goto fail
-kubectl -n %NS% set image deployment/frontend server=frontend-local:1.0.0
+call :build architecture-service:1.0.0 msa\dashboard
 if errorlevel 1 goto fail
-
-echo [6/8] Building and deploying reviews-service
-if not exist "msa\services\reviews-service\Dockerfile" goto no_reviews
-minikube image build -t reviews-service:1.0.0 msa\services\reviews-service
+if not exist "msa\services\reviews-service\Dockerfile" goto after_build
+call :build reviews-service:1.0.0 msa\services\reviews-service
 if errorlevel 1 goto fail
+:after_build
 kubectl apply -k msa\deploy\overlays\staging
 if errorlevel 1 goto fail
-goto wait_ready
-:no_reviews
-echo reviews-service Dockerfile not found, skipping that service.
+rem A freshly built image is not retried by Kubernetes until its pull back-off ends, so restart now
+if "%BUILT%"=="1" kubectl -n %NS% rollout restart deployment/frontend
 
 :wait_ready
-echo [7/8] Waiting for all deployments, this can take several minutes
-kubectl -n %NS% wait --for=condition=available deployment --all --timeout=600s
+echo [7/8] Waiting for the services, the load generator is not waited for
+kubectl -n %NS% wait --for=condition=available deployment --selector=app!=loadgenerator --timeout=600s
 if errorlevel 1 goto wait_fail
 goto forwards
 :wait_fail
@@ -147,9 +194,9 @@ exit /b 1
 
 :forwards
 echo [8/8] Starting port-forwards in separate windows
-start "boutique-frontend" cmd /c "kubectl -n %NS% port-forward svc/frontend 8080:80"
+start "boutique-frontend" cmd /c "msa\scripts\portforward.bat %NS% frontend 8080 80"
 if not exist "msa\services\reviews-service\Dockerfile" goto after_reviews_pf
-start "boutique-reviews" cmd /c "kubectl -n %NS% port-forward svc/reviews-service 8081:8080"
+start "boutique-reviews" cmd /c "msa\scripts\portforward.bat %NS% reviews-service 8081 8080"
 :after_reviews_pf
 timeout /t 5 /nobreak >nul
 start "" http://localhost:8080

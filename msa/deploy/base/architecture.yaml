@@ -1,0 +1,99 @@
+# architecture-service: live architecture and resilience console.
+# The shop frontend proxies /architecture to this Service, so it shares port 8080 with the shop.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: architecture-service
+---
+# Least privilege: only what the console needs, only in this namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: architecture-service
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: architecture-service
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: architecture-service
+subjects:
+  - kind: ServiceAccount
+    name: architecture-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: architecture-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: architecture-service
+  template:
+    metadata:
+      labels:
+        app: architecture-service
+    spec:
+      serviceAccountName: architecture-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: architecture-service
+          image: architecture-service:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8090
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8090
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 20m
+              memory: 48Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: architecture-service
+spec:
+  selector:
+    app: architecture-service
+  ports:
+    - port: 8090
+      targetPort: 8090

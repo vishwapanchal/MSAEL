@@ -48,7 +48,7 @@ echo [7/7] Checking /version again, expecting 1.0.0
 call :showversion
 
 echo Restarting the reviews port-forward window on 8081
-start "boutique-reviews" cmd /c "kubectl -n %NS% port-forward svc/reviews-service 8081:8080"
+start "boutique-reviews" cmd /c "msa\scripts\portforward.bat %NS% reviews-service 8081 8080"
 echo.
 echo Demo finished.
 exit /b 0

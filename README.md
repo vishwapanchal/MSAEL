@@ -42,6 +42,7 @@ The shop consists of 12 workloads written in several languages that talk gRPC, d
 | 9 | Containerised workspace, local Kubernetes, umbrella project | `Dockerfile`, `docker-compose.yml`, `msa/deploy/`, `run.bat` |
 | 10 | Releasing to staging, managing change | `boutique-staging` namespace, `msa/scripts/rollout_demo.bat`, `msa/docs/06-managing-change.md` |
 | + | Measuring complexity and progress | `msa/docs/07-complexity-and-progress.md` |
+| + | Resilience demo: Architecture console in the shop, live stats, scenarios, fault injection, auto-heal | `msa/dashboard/`, `src/frontend/architecture.go`, `msa/docs/PRESENTATION.md` |
 
 Not covered: Cassandra and AWS-specific setup.
 
@@ -62,6 +63,8 @@ Needs Windows 10/11, Docker Desktop (about 5 GB memory) and internet for the fir
 ```
 run.bat            start minikube and deploy the shop plus reviews-service into boutique-staging
 run.bat demo       rolling update 1.0.0 to 1.1.0, then rollback
+run.bat dashboard  open the Architecture console (same as the Architecture button in the shop)
+run.bat rebuild    rebuild our own images after code changes (they are skipped when already built)
 run.bat stop       stop port-forwards and minikube
 run.bat clean      delete the minikube cluster
 ```

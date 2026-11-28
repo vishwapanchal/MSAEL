@@ -14,7 +14,7 @@ Nothing in `msa/`, `run.bat` or the workflow was executed: the authoring machine
 | 6 | Data ownership | `msa/docs/05-data-and-cqrs.md` (table covers all services) | `ls src/cartservice/src/cartstore`; `grep -n "ALLOYDB_CLUSTER_NAME" src/productcatalogservice/catalog_loader.go`; `grep -n "REDIS_ADDR" src/cartservice/src/Startup.cs` | verified for cart and catalog; "no store found" for the other services is a negative finding from reading, not an exhaustive proof |
 | 7 | Event Sourcing + CQRS | `msa/services/reviews-service/app/{events,projection,main,models}.py`, `tests/test_reviews.py` | `cd msa/services/reviews-service && pip install -r requirements-dev.txt && pytest -q` | verified: 18 passed; smoke_test.py PASSED against local uvicorn (2026-11-25) |
 | 8 | IaC + CI | `msa/iac/staging/*.tf`, `.github/workflows/msa-ci.yaml` | `cd msa/iac/staging && terraform fmt -check && terraform init -backend=false && terraform validate`; CI: push a branch and read the Actions run | partly verified: `terraform fmt -check` passes; `terraform init` failed twice (network reset downloading the kubernetes provider) so `validate` not verified; workflow never run on GitHub |
-| 9 | Container workspace | `msa/services/reviews-service/Dockerfile`, `docker-compose.yml`, `msa/deploy/{base,overlays}`, `run.bat` | `docker compose -f msa/services/reviews-service/docker-compose.yml up --build`; `kubectl kustomize msa/deploy/overlays/staging`; `run.bat` | partly verified: `kubectl kustomize` renders staging and dev OK (namespace boutique-staging, image reviews-service:1.0.0); docker build, compose and `run.bat` not verified (Docker daemon not running) |
+| 9 | Container workspace | `msa/services/reviews-service/Dockerfile`, `docker-compose.yml`, `msa/deploy/{base,overlays}`, `run.bat` | `docker compose -f msa/services/reviews-service/docker-compose.yml up --build`; `kubectl kustomize msa/deploy/overlays/staging`; `run.bat` | verified on 2026-11-28: `run.bat` deployed the shop and reviews-service to minikube (13 workloads ready), reviews data persisted across a cluster stop and start; `docker compose` not run |
 | 10 | Staging release / change | `msa/deploy/overlays/staging`, `msa/scripts/rollout_demo.bat`, `msa/docs/06-managing-change.md` | `msa\scripts\rollout_demo.bat`, then `kubectl -n boutique-staging rollout history deployment/reviews-service` | not verified here |
 | - | `run.bat claude` fails gracefully without MASTER_PROMPT.md | `run.bat` labels `mode_claude`, `prompt_missing` | `run.bat claude` (expect "MASTER_PROMPT.md was not found", exit code 1) | not verified here (traced by reading: `where claude`, then `if not exist`) |
 
@@ -29,3 +29,28 @@ Nothing in `msa/`, `run.bat` or the workflow was executed: the authoring machine
 - Team Topologies assignments are a proposal; the repo records no real teams.
 - `msa/api/reviews-openapi.yaml` is hand-written and may differ cosmetically from FastAPI's generated output.
 - Pinned versions (fastapi 0.115.6, pydantic 2.10.4, uvicorn 0.34.0, httpx 0.28.1) were chosen by compatibility reasoning, not by installing them.
+
+## Live checks, 2026-11-28 (local minikube, namespace boutique-staging)
+
+| Check | Result |
+|---|---|
+| Earlier standalone dashboard prototype (replaced by the in-shop console below) | superseded |
+| Chaos: kill pod, scale to 0/1/2, unknown service rejected with HTTP 400 | verified (API level); the page itself was not inspected in a browser by the author |
+| reviews-service add review and rebuild projection through the dashboard | verified (4 events replayed) |
+| Frontend with Google branding removed built into minikube and served; no occurrence of "google" in the page | verified |
+| `msa\scripts\rollout_demo.bat` (rolling update and rollback) | not verified here |
+| `terraform validate` (provider download failed twice) | limitation |
+
+## Live checks, 2026-11-28 (Architecture console inside the shop)
+
+| Check | Result |
+|---|---|
+| Clean `run.bat` from an empty cluster to a passing smoke test | verified, about 5 minutes with cached base images; the first start of minikube on this PC is slower and once needed a retry |
+| Shop page has no footer text, session or pod ids, platform badge or "google" text; has the Architecture button | verified (page content and screenshot) |
+| `/architecture` served through the frontend on port 8080, console API via `architecture-service` with namespace-only RBAC | verified |
+| Live log stream follows a pod kill: old pod ends, stream attaches to the replacement pod | verified |
+| Auto-heal restores a scaled-to-0 service to its baseline in about 9 s; off switch respected; foreign Origin rejected (403); self-kill rejected (400) | verified |
+| Kill every pod: all 13 services back at baseline counts in 33 s, reviews events intact | verified |
+| Port-forward wrapper reconnects after the frontend is replaced (1 s) | verified |
+| Console UI checked in a headless Edge screenshot only; no interactive click-through by the author | limitation |
+| `msa\scripts\rollout_demo.bat` and `terraform validate` | not verified here |
